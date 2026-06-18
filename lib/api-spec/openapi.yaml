@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Queen's University Campus Map API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: buildings
+    description: Campus building operations
+  - name: events
+    description: Campus event operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,203 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /buildings:
+    get:
+      operationId: listBuildings
+      tags: [buildings]
+      summary: List all campus buildings
+      description: Returns all campus buildings with their coordinates and event status
+      responses:
+        "200":
+          description: List of buildings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Building"
+
+  /buildings/{id}:
+    get:
+      operationId: getBuilding
+      tags: [buildings]
+      summary: Get building with events
+      description: Returns a single building and its associated events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Building with events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildingWithEvents"
+        "404":
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List events with optional filters
+      description: Returns events filtered by category, timeframe, and search query
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, ams, club, academic, athletics]
+        - name: timeframe
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, now, today, week]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: buildingId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create a new event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventInput"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateEvent
+      tags: [events]
+      summary: Update an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventUpdate"
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Event deleted
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /events/summary:
+    get:
+      operationId: getEventsSummary
+      tags: [events]
+      summary: Get event summary by building
+      description: Returns counts and status of events per building for map highlighting
+      responses:
+        "200":
+          description: Event summary per building
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BuildingEventSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +235,229 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Building:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        shortName:
+          type: string
+        description:
+          type: ["string", "null"]
+        x:
+          type: number
+          description: X position on campus map (percentage 0-100)
+        y:
+          type: number
+          description: Y position on campus map (percentage 0-100)
+        width:
+          type: number
+          description: Width on campus map (percentage)
+        height:
+          type: number
+          description: Height on campus map (percentage)
+        eventStatus:
+          type: string
+          enum: [none, upcoming_week, upcoming_today, active]
+          description: Highest priority event status for this building
+        activeEventCount:
+          type: integer
+        todayEventCount:
+          type: integer
+        weekEventCount:
+          type: integer
+      required:
+        - id
+        - name
+        - shortName
+        - x
+        - y
+        - width
+        - height
+        - eventStatus
+        - activeEventCount
+        - todayEventCount
+        - weekEventCount
+
+    BuildingWithEvents:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        shortName:
+          type: string
+        description:
+          type: ["string", "null"]
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        eventStatus:
+          type: string
+          enum: [none, upcoming_week, upcoming_today, active]
+        activeEventCount:
+          type: integer
+        todayEventCount:
+          type: integer
+        weekEventCount:
+          type: integer
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+      required:
+        - id
+        - name
+        - shortName
+        - x
+        - y
+        - width
+        - height
+        - eventStatus
+        - activeEventCount
+        - todayEventCount
+        - weekEventCount
+        - events
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        organizer:
+          type: string
+        buildingId:
+          type: integer
+        buildingName:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        description:
+          type: ["string", "null"]
+        registrationLink:
+          type: ["string", "null"]
+        locationDetails:
+          type: ["string", "null"]
+        category:
+          type: string
+          enum: [ams, club, academic, athletics]
+        status:
+          type: string
+          enum: [active, upcoming_today, upcoming_week, future]
+      required:
+        - id
+        - title
+        - organizer
+        - buildingId
+        - buildingName
+        - startTime
+        - endTime
+        - category
+        - status
+
+    EventInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        organizer:
+          type: string
+          minLength: 1
+        buildingId:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        description:
+          type: string
+        registrationLink:
+          type: string
+        locationDetails:
+          type: string
+        category:
+          type: string
+          enum: [ams, club, academic, athletics]
+      required:
+        - title
+        - organizer
+        - buildingId
+        - startTime
+        - endTime
+        - category
+
+    EventUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        organizer:
+          type: string
+          minLength: 1
+        buildingId:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        description:
+          type: string
+        registrationLink:
+          type: string
+        locationDetails:
+          type: string
+        category:
+          type: string
+          enum: [ams, club, academic, athletics]
+
+    BuildingEventSummary:
+      type: object
+      properties:
+        buildingId:
+          type: integer
+        buildingName:
+          type: string
+        eventStatus:
+          type: string
+          enum: [none, upcoming_week, upcoming_today, active]
+        activeEventCount:
+          type: integer
+        todayEventCount:
+          type: integer
+        weekEventCount:
+          type: integer
+      required:
+        - buildingId
+        - buildingName
+        - eventStatus
+        - activeEventCount
+        - todayEventCount
+        - weekEventCount
