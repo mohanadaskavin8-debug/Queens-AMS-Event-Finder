@@ -1,0 +1,1 @@
+- [WebGL screenshot limitation](webgl-screenshot-limitation.md) — agent screenshot tool has no GPU, so WebGL maps render blank in screenshots but work in the user's real browser.

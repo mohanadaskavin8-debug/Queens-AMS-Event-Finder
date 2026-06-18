@@ -32,14 +32,17 @@ export interface Building {
   shortName: string;
   /** @nullable */
   description?: string | null;
-  /** X position on campus map (percentage 0-100) */
-  x: number;
-  /** Y position on campus map (percentage 0-100) */
-  y: number;
-  /** Width on campus map (percentage) */
-  width: number;
-  /** Height on campus map (percentage) */
-  height: number;
+  /** Building centroid latitude (WGS84) */
+  latitude: number;
+  /** Building centroid longitude (WGS84) */
+  longitude: number;
+  /** Number of floors, used for 3D extrusion height */
+  levels: number;
+  /**
+     * Polygon ring as an array of [longitude, latitude] coordinate pairs, or null when only a point marker is known
+     * @nullable
+     */
+  footprint?: number[][] | null;
   /** Highest priority event status for this building */
   eventStatus: BuildingEventStatus;
   activeEventCount: number;
@@ -101,10 +104,11 @@ export interface BuildingWithEvents {
   shortName: string;
   /** @nullable */
   description?: string | null;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  latitude: number;
+  longitude: number;
+  levels: number;
+  /** @nullable */
+  footprint?: number[][] | null;
   eventStatus: BuildingWithEventsEventStatus;
   activeEventCount: number;
   todayEventCount: number;

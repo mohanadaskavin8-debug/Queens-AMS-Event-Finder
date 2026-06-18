@@ -181,3 +181,181 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* ============================================================
+   Campus map — MapLibre overrides, markers, glass UI, motion
+   ============================================================ */
+
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+}
+.dark .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: rgba(10, 22, 40, 0.6);
+  color: hsl(210 40% 80%);
+}
+.maplibregl-ctrl-group {
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -8px rgba(0, 36, 82, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(12px);
+}
+.dark .maplibregl-ctrl-group {
+  background: rgba(13, 27, 46, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.maplibregl-ctrl-group button {
+  width: 34px !important;
+  height: 34px !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+.dark .maplibregl-ctrl-group button {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* --- Building markers --- */
+.qmap-marker {
+  --qmap-color: #64748b;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  will-change: transform;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.qmap-marker:hover {
+  transform: translateY(-3px) scale(1.06);
+  z-index: 40 !important;
+}
+.qmap-pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--qmap-color);
+  border: 2.5px solid #fff;
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.5);
+}
+.dark .qmap-pin {
+  border-color: rgba(255, 255, 255, 0.9);
+}
+.qmap-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fff;
+  transform: rotate(45deg);
+}
+.qmap-badge {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  transform: rotate(45deg);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #002452;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.qmap-label {
+  margin-top: 5px;
+  max-width: 130px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #0f2747;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.dark .qmap-label {
+  color: hsl(210 40% 96%);
+  background: rgba(13, 27, 46, 0.85);
+}
+.qmap-marker:hover .qmap-label,
+.qmap-marker[data-selected="true"] .qmap-label,
+.qmap-marker[data-status="active"] .qmap-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+.qmap-marker[data-selected="true"] {
+  transform: scale(1.18);
+  z-index: 50 !important;
+}
+.qmap-marker[data-selected="true"] .qmap-pin {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qmap-color) 35%, transparent),
+    0 8px 20px -4px rgba(0, 0, 0, 0.55);
+}
+.qmap-pulse {
+  position: absolute;
+  top: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--qmap-color);
+  opacity: 0.7;
+  animation: qmap-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes qmap-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* --- Glassmorphism panels --- */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 18px 50px -20px rgba(0, 36, 82, 0.4);
+}
+.dark .glass {
+  background: rgba(11, 22, 40, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.7);
+}
+
+.fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

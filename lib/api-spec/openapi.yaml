@@ -254,18 +254,22 @@ components:
           type: string
         description:
           type: ["string", "null"]
-        x:
+        latitude:
           type: number
-          description: X position on campus map (percentage 0-100)
-        y:
+          description: Building centroid latitude (WGS84)
+        longitude:
           type: number
-          description: Y position on campus map (percentage 0-100)
-        width:
-          type: number
-          description: Width on campus map (percentage)
-        height:
-          type: number
-          description: Height on campus map (percentage)
+          description: Building centroid longitude (WGS84)
+        levels:
+          type: integer
+          description: Number of floors, used for 3D extrusion height
+        footprint:
+          type: ["array", "null"]
+          description: Polygon ring as an array of [longitude, latitude] coordinate pairs, or null when only a point marker is known
+          items:
+            type: array
+            items:
+              type: number
         eventStatus:
           type: string
           enum: [none, upcoming_week, upcoming_today, active]
@@ -280,10 +284,9 @@ components:
         - id
         - name
         - shortName
-        - x
-        - y
-        - width
-        - height
+        - latitude
+        - longitude
+        - levels
         - eventStatus
         - activeEventCount
         - todayEventCount
@@ -300,14 +303,18 @@ components:
           type: string
         description:
           type: ["string", "null"]
-        x:
+        latitude:
           type: number
-        y:
+        longitude:
           type: number
-        width:
-          type: number
-        height:
-          type: number
+        levels:
+          type: integer
+        footprint:
+          type: ["array", "null"]
+          items:
+            type: array
+            items:
+              type: number
         eventStatus:
           type: string
           enum: [none, upcoming_week, upcoming_today, active]
@@ -325,10 +332,9 @@ components:
         - id
         - name
         - shortName
-        - x
-        - y
-        - width
-        - height
+        - latitude
+        - longitude
+        - levels
         - eventStatus
         - activeEventCount
         - todayEventCount

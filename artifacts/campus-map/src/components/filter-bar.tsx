@@ -13,7 +13,7 @@ interface FilterBarProps {
 
 export function FilterBar({ category, timeframe, onChangeCategory, onChangeTimeframe }: FilterBarProps) {
   return (
-    <div className="w-full bg-background border-b border-border shadow-sm px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4 sticky top-0 z-20">
+    <div className="w-full px-2.5 py-2 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div className="flex items-center w-full sm:w-auto">
         <ScrollArea className="w-full max-w-full whitespace-nowrap">
           <div className="flex items-center space-x-4">

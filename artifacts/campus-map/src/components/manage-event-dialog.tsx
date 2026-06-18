@@ -3,6 +3,7 @@ import {
   useCreateEvent, 
   useUpdateEvent, 
   useGetEvent,
+  getGetEventQueryKey,
   getGetBuildingQueryKey,
   getListEventsQueryKey,
   getListBuildingsQueryKey,
@@ -10,7 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { EventForm } from "./event-form";
+import { EventForm, toLocalInput } from "./event-form";
 import { useToast } from "@/hooks/use-toast";
 
 interface ManageEventDialogProps {
@@ -25,6 +26,7 @@ export function ManageEventDialog({ eventId, isOpen, onClose }: ManageEventDialo
 
   const { data: existingEvent, isLoading: isFetching } = useGetEvent(eventId as number, {
     query: {
+      queryKey: getGetEventQueryKey(eventId as number),
       enabled: !!eventId && isOpen
     }
   });
@@ -58,7 +60,7 @@ export function ManageEventDialog({ eventId, isOpen, onClose }: ManageEventDialo
             onClose();
           },
           onError: (err) => {
-            toast({ title: "Error updating event", description: err.error, variant: "destructive" });
+            toast({ title: "Error updating event", description: err.message, variant: "destructive" });
           }
         }
       );
@@ -72,7 +74,7 @@ export function ManageEventDialog({ eventId, isOpen, onClose }: ManageEventDialo
             onClose();
           },
           onError: (err) => {
-            toast({ title: "Error creating event", description: err.error, variant: "destructive" });
+            toast({ title: "Error creating event", description: err.message, variant: "destructive" });
           }
         }
       );
@@ -96,9 +98,14 @@ export function ManageEventDialog({ eventId, isOpen, onClose }: ManageEventDialo
         ) : (
           <EventForm 
             initialValues={existingEvent ? {
-              ...existingEvent,
-              startTime: new Date(existingEvent.startTime).toISOString().slice(0, 16),
-              endTime: new Date(existingEvent.endTime).toISOString().slice(0, 16),
+              title: existingEvent.title,
+              organizer: existingEvent.organizer,
+              buildingId: existingEvent.buildingId,
+              startTime: toLocalInput(new Date(existingEvent.startTime)),
+              endTime: toLocalInput(new Date(existingEvent.endTime)),
+              description: existingEvent.description ?? undefined,
+              registrationLink: existingEvent.registrationLink ?? undefined,
+              locationDetails: existingEvent.locationDetails ?? undefined,
               category: existingEvent.category as EventInputCategory
             } : undefined}
             onSubmit={handleSubmit}

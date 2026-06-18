@@ -9,17 +9,29 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-const eventFormSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  organizer: z.string().min(1, "Organizer is required"),
-  buildingId: z.coerce.number().min(1, "Building is required"),
-  startTime: z.string().min(1, "Start time is required"),
-  endTime: z.string().min(1, "End time is required"),
-  description: z.string().optional(),
-  registrationLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  locationDetails: z.string().optional(),
-  category: z.nativeEnum(EventInputCategory)
-});
+// Format a Date into the `YYYY-MM-DDTHH:mm` shape a datetime-local input expects,
+// using local wall-clock time (not UTC).
+export function toLocalInput(date: Date): string {
+  const offsetMs = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+const eventFormSchema = z
+  .object({
+    title: z.string().min(1, "Title is required"),
+    organizer: z.string().min(1, "Organizer is required"),
+    buildingId: z.coerce.number().min(1, "Building is required"),
+    startTime: z.string().min(1, "Start time is required"),
+    endTime: z.string().min(1, "End time is required"),
+    description: z.string().optional(),
+    registrationLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+    locationDetails: z.string().optional(),
+    category: z.nativeEnum(EventInputCategory)
+  })
+  .refine((d) => new Date(d.endTime) > new Date(d.startTime), {
+    message: "End time must be after the start time",
+    path: ["endTime"]
+  });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
 
@@ -38,8 +50,8 @@ export function EventForm({ initialValues, onSubmit, isSubmitting }: EventFormPr
       title: initialValues?.title || "",
       organizer: initialValues?.organizer || "",
       buildingId: initialValues?.buildingId || 0,
-      startTime: initialValues?.startTime || new Date().toISOString().slice(0, 16),
-      endTime: initialValues?.endTime || new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+      startTime: initialValues?.startTime || toLocalInput(new Date()),
+      endTime: initialValues?.endTime || toLocalInput(new Date(Date.now() + 3600000)),
       description: initialValues?.description || "",
       registrationLink: initialValues?.registrationLink || "",
       locationDetails: initialValues?.locationDetails || "",

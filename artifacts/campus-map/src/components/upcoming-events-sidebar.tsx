@@ -11,8 +11,8 @@ interface UpcomingEventsSidebarProps {
 
 export function UpcomingEventsSidebar({ events, isLoading }: UpcomingEventsSidebarProps) {
   return (
-    <div className="h-full flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-r border-border shadow-sm">
-      <div className="p-4 border-b border-border">
+    <div className="h-full flex flex-col bg-transparent">
+      <div className="p-4 pr-12 border-b border-border/60">
         <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
           <CalendarDays className="w-5 h-5 text-primary" />
           Upcoming Events

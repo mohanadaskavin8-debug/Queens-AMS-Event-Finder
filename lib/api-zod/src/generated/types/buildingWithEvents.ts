@@ -14,10 +14,11 @@ export interface BuildingWithEvents {
   shortName: string;
   /** @nullable */
   description?: string | null;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  latitude: number;
+  longitude: number;
+  levels: number;
+  /** @nullable */
+  footprint?: number[][] | null;
   eventStatus: BuildingWithEventsEventStatus;
   activeEventCount: number;
   todayEventCount: number;

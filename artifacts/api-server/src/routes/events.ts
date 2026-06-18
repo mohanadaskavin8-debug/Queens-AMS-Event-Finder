@@ -122,6 +122,7 @@ router.get("/events", async (req, res): Promise<void> => {
       or(
         ilike(eventsTable.title, q),
         ilike(eventsTable.organizer, q),
+        ilike(buildingsTable.name, q),
       )
     );
   }
@@ -136,24 +137,13 @@ router.get("/events", async (req, res): Promise<void> => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(eventsTable.startTime);
 
-  // Also handle building name search
-  let result = rows.map((r) => ({
+  const result = rows.map((r) => ({
     ...r.event,
     buildingName: r.buildingName,
     status: getEventStatusFromDates(r.event.startTime, r.event.endTime, now),
     startTime: r.event.startTime.toISOString(),
     endTime: r.event.endTime.toISOString(),
   }));
-
-  if (search) {
-    const q = search.toLowerCase();
-    result = result.filter(
-      (e) =>
-        e.title.toLowerCase().includes(q) ||
-        e.organizer.toLowerCase().includes(q) ||
-        e.buildingName.toLowerCase().includes(q)
-    );
-  }
 
   res.json(result);
 });
