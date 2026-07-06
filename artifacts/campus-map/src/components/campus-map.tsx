@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Feature, FeatureCollection } from "geojson";
+import type { FilterSpecification } from "mapbox-gl";
 import type { Building } from "@workspace/api-client-react";
 
 export type MapTheme = "day" | "night";
@@ -33,6 +34,50 @@ const STATUS_COLOR: Record<string, string> = {
   upcoming_week: "#3b82f6",
   none: "#64748b",
 };
+
+interface CampusFeatureProps {
+  fid: number;
+  clon: number;
+  clat: number;
+  kind: string;
+  name: string | null;
+  leisure: string | null;
+}
+
+type CampusCentroid = { fid: number; clon: number; clat: number; kind: string };
+
+// Campus features that coincide with a DB event building (matched by proximity of
+// centroids). Those buildings render colored extrusions + animated HTML markers, so
+// we exclude their footprint/pin from the generic campus layers to avoid duplicates.
+function computeDbFids(buildings: Building[], features: CampusCentroid[]): number[] {
+  const R = 6371000;
+  const toRad = Math.PI / 180;
+  const MAX = 50; // metres
+  const fids: number[] = [];
+  for (const b of buildings) {
+    // Only footprint-backed buildings dedupe cleanly (they match their own OSM
+    // footprint at ~0 m). Marker-only buildings can have imprecise seed
+    // coordinates that would wrongly suppress an innocent neighbour.
+    if (!b.footprint || b.footprint.length < 4) continue;
+    let best = -1;
+    let bestD = MAX;
+    for (const f of features) {
+      if (f.kind !== "building") continue;
+      const dLat = (b.latitude - f.clat) * toRad;
+      const dLng = (b.longitude - f.clon) * toRad;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(f.clat * toRad) * Math.cos(b.latitude * toRad) * Math.sin(dLng / 2) ** 2;
+      const d = 2 * R * Math.asin(Math.sqrt(a));
+      if (d < bestD) {
+        bestD = d;
+        best = f.fid;
+      }
+    }
+    if (best >= 0) fids.push(best);
+  }
+  return fids;
+}
 
 function buildingsToFeatureCollection(
   buildings: Building[],
@@ -74,6 +119,8 @@ export function CampusMap({
   const selectedRef = useRef<number | null>(selectedBuildingId);
   const onSelectRef = useRef(onSelectBuilding);
   const styleReadyRef = useRef(false);
+  const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const campusFeaturesRef = useRef<CampusCentroid[]>([]);
   const [initError, setInitError] = useState<null | "token" | "webgl">(null);
 
   buildingsRef.current = buildings;
@@ -82,7 +129,7 @@ export function CampusMap({
   onSelectRef.current = onSelectBuilding;
 
   // Add the event-status highlight source + extrusion layer + terrain.
-  const addCampusLayers = useCallback((map: mapboxgl.Map) => {
+  const addCampusLayers = useCallback(async (map: mapboxgl.Map) => {
     // Real 3D terrain relief.
     if (!map.getSource("mapbox-dem")) {
       map.addSource("mapbox-dem", {
@@ -96,6 +143,94 @@ export function CampusMap({
       map.setTerrain({ source: "mapbox-dem", exaggeration: 1.1 });
     } catch {
       /* terrain unsupported, ignore */
+    }
+
+    // Full Queen's campus footprints (all buildings + parks/fields) — clickable context.
+    if (!map.getSource("campus")) {
+      let data: FeatureCollection = { type: "FeatureCollection", features: [] };
+      try {
+        const res = await fetch(`${import.meta.env.BASE_URL}queens-campus.geojson`);
+        data = await res.json();
+      } catch {
+        /* keep empty on failure */
+      }
+      if (mapRef.current !== map) return; // unmounted during fetch
+      // Cache centroid records for proximity dedupe against DB event buildings.
+      campusFeaturesRef.current = (data.features ?? []).map((f) => {
+        const p = (f.properties ?? {}) as CampusFeatureProps;
+        return { fid: p.fid, clon: p.clon, clat: p.clat, kind: p.kind };
+      });
+      if (!map.getSource("campus")) {
+        map.addSource("campus", { type: "geojson", data, promoteId: "fid" });
+      }
+      // Point source (centroids) drives pins + labels: one marker per feature,
+      // not one dot per polygon vertex.
+      if (!map.getSource("campus-points")) {
+        const points: FeatureCollection = {
+          type: "FeatureCollection",
+          features: (data.features ?? []).map((f) => {
+            const p = (f.properties ?? {}) as CampusFeatureProps;
+            return {
+              type: "Feature",
+              id: p.fid,
+              properties: p,
+              geometry: { type: "Point", coordinates: [p.clon, p.clat] },
+            } as Feature;
+          }),
+        };
+        map.addSource("campus-points", { type: "geojson", data: points, promoteId: "fid" });
+      }
+    }
+
+    const dbFids = computeDbFids(buildingsRef.current, campusFeaturesRef.current);
+    const notDb = ["!", ["in", ["get", "fid"], ["literal", dbFids]]] as FilterSpecification;
+    const campusBuildingFilter = [
+      "all",
+      ["==", ["get", "kind"], "building"],
+      ["!", ["in", ["get", "fid"], ["literal", dbFids]]],
+    ] as FilterSpecification;
+
+    // Parks / fields / gardens.
+    if (!map.getLayer("campus-green")) {
+      map.addLayer({
+        id: "campus-green",
+        type: "fill",
+        source: "campus",
+        slot: "middle",
+        filter: ["==", ["get", "kind"], "leisure"],
+        paint: {
+          "fill-color": ["match", ["get", "leisure"], "playground", "#f59e0b", "#22c55e"],
+          "fill-opacity": 0.16,
+        },
+      });
+    }
+    if (!map.getLayer("campus-green-outline")) {
+      map.addLayer({
+        id: "campus-green-outline",
+        type: "line",
+        source: "campus",
+        slot: "middle",
+        filter: ["==", ["get", "kind"], "leisure"],
+        paint: { "line-color": "#16a34a", "line-width": 1.1, "line-opacity": 0.5 },
+      });
+    }
+
+    // Every campus building as neutral 3D context (clickable, sits under event colors).
+    if (!map.getLayer("campus-buildings-3d")) {
+      map.addLayer({
+        id: "campus-buildings-3d",
+        type: "fill-extrusion",
+        source: "campus",
+        slot: "middle",
+        filter: campusBuildingFilter,
+        paint: {
+          "fill-extrusion-color": "#8ea3bf",
+          "fill-extrusion-height": ["max", ["*", ["get", "levels"], 4.2], 10],
+          "fill-extrusion-base": 0,
+          "fill-extrusion-opacity": 0.85,
+          "fill-extrusion-vertical-gradient": true,
+        },
+      });
     }
 
     // Event-building highlight extrusions (colored by status).
@@ -136,6 +271,47 @@ export function CampusMap({
             0.92,
           ],
           "fill-extrusion-vertical-gradient": true,
+        },
+      });
+    }
+
+    // Pins + name labels for every campus feature (excluding DB event buildings,
+    // which render richer animated HTML markers). Native layers scale to hundreds.
+    if (!map.getLayer("campus-pins")) {
+      map.addLayer({
+        id: "campus-pins",
+        type: "circle",
+        source: "campus-points",
+        slot: "top",
+        filter: notDb,
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 2, 15.5, 3.5, 18, 5.5],
+          "circle-color": ["match", ["get", "kind"], "leisure", "#16a34a", "#1e3a8a"],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.4,
+          "circle-opacity": 0.95,
+        },
+      });
+    }
+    if (!map.getLayer("campus-labels")) {
+      map.addLayer({
+        id: "campus-labels",
+        type: "symbol",
+        source: "campus-points",
+        slot: "top",
+        filter: notDb,
+        layout: {
+          "text-field": ["coalesce", ["get", "name"], ""],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 17, 12.5],
+          "text-offset": [0, -1.2],
+          "text-anchor": "bottom",
+          "text-optional": true,
+          "symbol-sort-key": ["case", ["==", ["get", "kind"], "building"], 0, 1],
+        },
+        paint: {
+          "text-color": "#0f172a",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.4,
         },
       });
     }
@@ -307,8 +483,10 @@ export function CampusMap({
       } catch {
         /* config unsupported, ignore */
       }
-      addCampusLayers(map);
-      map.flyTo({ ...OVERVIEW, duration: 3200, essential: true });
+      void addCampusLayers(map).then(() => {
+        if (mapRef.current !== map) return; // unmounted during async layer setup
+        map.flyTo({ ...OVERVIEW, duration: 3200, essential: true });
+      });
     });
 
     map.on("error", (e) => {
@@ -319,28 +497,69 @@ export function CampusMap({
       }
     });
 
-    // Clicking a highlighted building footprint selects it; empty map clears.
+    // Lightweight info popup for any campus building / space.
+    const typeLabel = (p: { kind?: string; leisure?: string }) => {
+      if (p.kind === "building") return "Queen's building";
+      const m: Record<string, string> = { park: "Park", pitch: "Sports field", garden: "Garden", playground: "Playground" };
+      return (p.leisure && m[p.leisure]) || "Campus space";
+    };
+    const showFeaturePopup = (
+      lngLat: mapboxgl.LngLatLike,
+      p: { name?: string; kind?: string; leisure?: string }
+    ) => {
+      popupRef.current?.remove();
+      const card = document.createElement("div");
+      card.className = "qmap-popup";
+      const title = document.createElement("div");
+      title.className = "qmap-popup-title";
+      title.textContent = p.name || typeLabel(p);
+      const sub = document.createElement("div");
+      sub.className = "qmap-popup-sub";
+      sub.textContent = typeLabel(p);
+      card.append(title, sub);
+      popupRef.current = new mapboxgl.Popup({ closeButton: false, offset: 14, className: "qmap-popup-wrap" })
+        .setLngLat(lngLat)
+        .setDOMContent(card)
+        .addTo(map);
+    };
+
+    // Click priority: event building (rich panel) → any campus feature (popup) → clear.
     map.on("click", (e) => {
       if (map.getLayer("events-3d")) {
-        const feats = map.queryRenderedFeatures(e.point, { layers: ["events-3d"] });
-        const fid = feats[0]?.id;
+        const ev = map.queryRenderedFeatures(e.point, { layers: ["events-3d"] });
+        const fid = ev[0]?.id;
         if (typeof fid === "number") {
+          popupRef.current?.remove();
           const cur = selectedRef.current;
           onSelectRef.current(cur === fid ? null : fid);
           return;
         }
       }
+      const ctxLayers = ["campus-buildings-3d", "campus-green"].filter((l) => map.getLayer(l));
+      if (ctxLayers.length) {
+        const f = map.queryRenderedFeatures(e.point, { layers: ctxLayers })[0];
+        if (f) {
+          showFeaturePopup(e.lngLat, (f.properties ?? {}) as { name?: string; kind?: string; leisure?: string });
+          onSelectRef.current(null);
+          return;
+        }
+      }
+      popupRef.current?.remove();
       onSelectRef.current(null);
     });
 
-    map.on("mouseenter", "events-3d", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "events-3d", () => {
-      map.getCanvas().style.cursor = "";
-    });
+    for (const layerId of ["events-3d", "campus-buildings-3d", "campus-green"]) {
+      map.on("mouseenter", layerId, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", layerId, () => {
+        map.getCanvas().style.cursor = "";
+      });
+    }
 
     return () => {
+      popupRef.current?.remove();
+      popupRef.current = null;
       for (const [, marker] of markersRef.current) marker.remove();
       markersRef.current.clear();
       map.remove();
@@ -367,6 +586,19 @@ export function CampusMap({
     if (!map || !styleReadyRef.current) return;
     const src = map.getSource("events") as mapboxgl.GeoJSONSource | undefined;
     if (src) src.setData(buildingsToFeatureCollection(buildings, visibleCategories));
+    // Keep DB event buildings out of the generic campus layers (they render colored
+    // extrusions + HTML markers). Recompute the proximity dedupe as buildings change.
+    const dbFids = computeDbFids(buildings, campusFeaturesRef.current);
+    const notDb = ["!", ["in", ["get", "fid"], ["literal", dbFids]]] as FilterSpecification;
+    const bFilter = [
+      "all",
+      ["==", ["get", "kind"], "building"],
+      ["!", ["in", ["get", "fid"], ["literal", dbFids]]],
+    ] as FilterSpecification;
+    if (map.getLayer("campus-buildings-3d")) map.setFilter("campus-buildings-3d", bFilter);
+    for (const layerId of ["campus-pins", "campus-labels"]) {
+      if (map.getLayer(layerId)) map.setFilter(layerId, notDb);
+    }
     syncMarkers();
     applySelection(selectedRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,1 +1,3 @@
-- [WebGL screenshot limitation](webgl-screenshot-limitation.md) — agent screenshot tool has no GPU, so WebGL maps render blank in screenshots but work in the user's real browser.
+# Memory index
+
+- [Campus map OSM clickable layers](campus-map-osm-layers.md) — Mapbox GL pitfalls: centroid Point source for pins (not polygon vertices), fid/proximity dedupe (not name/null), footprint-only dedupe, top slot.
