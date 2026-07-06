@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   useListBuildings,
   useGetBuilding,
@@ -12,7 +12,7 @@ import {
 import { CampusMap, type MapTheme } from "@/components/campus-map";
 import { EventPanel } from "@/components/event-panel";
 import { FilterBar } from "@/components/filter-bar";
-import { SearchBar } from "@/components/search-bar";
+import { SearchBar, type SearchSuggestion } from "@/components/search-bar";
 import { CampusSidebar, BUILDING_CATEGORIES } from "@/components/campus-sidebar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,27 @@ const LEGEND = [
   { label: "This week", color: "#3b82f6" },
   { label: "No events", color: "#64748b" },
 ];
+
+interface CampusPlace {
+  fid: number;
+  name: string;
+  kind: string;
+  leisure: string | null;
+  lng: number;
+  lat: number;
+}
+
+const LEISURE_LABEL: Record<string, string> = {
+  park: "Park",
+  pitch: "Athletics field",
+  garden: "Garden",
+  playground: "Playground",
+};
+
+function placeSubtitle(kind: string, leisure: string | null): string {
+  if (kind === "leisure") return (leisure && LEISURE_LABEL[leisure]) || "Outdoor space";
+  return "Campus building";
+}
 
 export default function MapView() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
@@ -40,6 +61,30 @@ export default function MapView() {
   const [visibleCategories, setVisibleCategories] = useState<Set<string>>(
     () => new Set(BUILDING_CATEGORIES)
   );
+  const [campusPlaces, setCampusPlaces] = useState<CampusPlace[]>([]);
+  const [flyToTarget, setFlyToTarget] = useState<{ lng: number; lat: number; zoom?: number } | null>(null);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}queens-campus.geojson`)
+      .then((r) => r.json())
+      .then((data) => {
+        const places: CampusPlace[] = [];
+        for (const f of data.features ?? []) {
+          const p = f.properties ?? {};
+          if (!p.name) continue;
+          places.push({
+            fid: p.fid,
+            name: p.name,
+            kind: p.kind,
+            leisure: p.leisure ?? null,
+            lng: p.clon,
+            lat: p.clat,
+          });
+        }
+        setCampusPlaces(places);
+      })
+      .catch(() => {});
+  }, []);
 
   const toggleCategory = (cat: string) =>
     setVisibleCategories((prev) => {
@@ -103,6 +148,47 @@ export default function MapView() {
     [buildings]
   );
 
+  const searchSuggestions = useMemo((): SearchSuggestion[] => {
+    if (!search || search.length < 2) return [];
+    const q = search.toLowerCase().trim();
+    const results: SearchSuggestion[] = [];
+    const dbNames = new Set<string>();
+    for (const b of buildings) {
+      if (b.name.toLowerCase().includes(q) || b.shortName.toLowerCase().includes(q)) {
+        results.push({
+          type: "building",
+          dbId: b.id,
+          name: b.name,
+          subtitle: b.category.replace(/_/g, " "),
+          lng: b.longitude,
+          lat: b.latitude,
+        });
+        dbNames.add(b.name.toLowerCase());
+      }
+    }
+    for (const p of campusPlaces) {
+      if (dbNames.has(p.name.toLowerCase())) continue;
+      if (!p.name.toLowerCase().includes(q)) continue;
+      results.push({
+        type: "place",
+        name: p.name,
+        subtitle: placeSubtitle(p.kind, p.leisure),
+        lng: p.lng,
+        lat: p.lat,
+      });
+    }
+    return results.slice(0, 8);
+  }, [search, buildings, campusPlaces]);
+
+  const handleSelectSuggestion = (s: SearchSuggestion) => {
+    if (s.dbId != null) {
+      setSelectedBuildingId(s.dbId);
+    } else {
+      setFlyToTarget({ lng: s.lng, lat: s.lat, zoom: 17.5 });
+    }
+    setSearch("");
+  };
+
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-[#eef2f7] dark:bg-[#0a1424]">
       <CampusMap
@@ -113,6 +199,7 @@ export default function MapView() {
         visibleCategories={visibleCategories}
         recenterSignal={recenter}
         pitchSignal={pitchSignal}
+        flyToTarget={flyToTarget}
       />
 
       {/* Top bar */}
@@ -143,7 +230,12 @@ export default function MapView() {
 
           {/* Search */}
           <div className="glass fade-up pointer-events-auto hidden flex-1 rounded-2xl px-2 py-1.5 sm:block">
-            <SearchBar value={search} onChange={setSearch} />
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              suggestions={searchSuggestions}
+              onSelectSuggestion={handleSelectSuggestion}
+            />
           </div>
 
           <div className="flex-1 sm:hidden" />
@@ -210,7 +302,12 @@ export default function MapView() {
 
         {/* Mobile search */}
         <div className="glass fade-up pointer-events-auto mx-auto mt-2 max-w-[1500px] rounded-2xl px-2 py-1.5 sm:hidden">
-          <SearchBar value={search} onChange={setSearch} />
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            suggestions={searchSuggestions}
+            onSelectSuggestion={handleSelectSuggestion}
+          />
         </div>
       </div>
 

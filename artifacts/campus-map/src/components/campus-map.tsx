@@ -18,6 +18,8 @@ interface CampusMapProps {
   recenterSignal?: number;
   /** Increment to toggle the map tilt (pitch). */
   pitchSignal?: number;
+  /** New object reference triggers a fly-to at those coordinates (from search). */
+  flyToTarget?: { lng: number; lat: number; zoom?: number } | null;
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
@@ -110,6 +112,7 @@ export function CampusMap({
   visibleCategories,
   recenterSignal = 0,
   pitchSignal = 0,
+  flyToTarget,
 }: CampusMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -275,24 +278,7 @@ export function CampusMap({
       });
     }
 
-    // Pins + name labels for every campus feature (excluding DB event buildings,
-    // which render richer animated HTML markers). Native layers scale to hundreds.
-    if (!map.getLayer("campus-pins")) {
-      map.addLayer({
-        id: "campus-pins",
-        type: "circle",
-        source: "campus-points",
-        slot: "top",
-        filter: notDb,
-        paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 2, 15.5, 3.5, 18, 5.5],
-          "circle-color": ["match", ["get", "kind"], "leisure", "#16a34a", "#1e3a8a"],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1.4,
-          "circle-opacity": 0.95,
-        },
-      });
-    }
+    // Name labels for campus features (DB event buildings use HTML markers instead).
     if (!map.getLayer("campus-labels")) {
       map.addLayer({
         id: "campus-labels",
@@ -333,7 +319,8 @@ export function CampusMap({
       const categoryVisible = visibleRef.current.has(b.category);
       let marker = markersRef.current.get(b.id);
 
-      if (!categoryVisible) {
+      // No badge for hidden categories or buildings with no events.
+      if (!categoryVisible || b.eventStatus === "none") {
         if (marker) {
           marker.remove();
           markersRef.current.delete(b.id);
@@ -375,27 +362,25 @@ export function CampusMap({
 
       const inner = document.createElement("div");
       inner.className = "qmap-marker";
+
+      // Pulse ring for live events.
       if (isActive) {
         const pulse = document.createElement("span");
         pulse.className = "qmap-pulse";
         inner.appendChild(pulse);
       }
-      const pin = document.createElement("span");
-      pin.className = "qmap-pin";
-      const dot = document.createElement("span");
-      dot.className = "qmap-dot";
-      pin.appendChild(dot);
-      if (count > 0) {
-        const badge = document.createElement("span");
-        badge.className = "qmap-badge";
-        badge.textContent = String(count);
-        pin.appendChild(badge);
-      }
-      inner.appendChild(pin);
+
+      // Instagram-style notification badge with event count.
+      const notif = document.createElement("div");
+      notif.className = "qmap-notif";
+      notif.textContent = String(count > 0 ? count : 1);
+      inner.appendChild(notif);
+
       const label = document.createElement("span");
       label.className = "qmap-label";
       label.textContent = b.shortName;
       inner.appendChild(label);
+
       el.replaceChildren(inner);
     }
 
@@ -596,7 +581,7 @@ export function CampusMap({
       ["!", ["in", ["get", "fid"], ["literal", dbFids]]],
     ] as FilterSpecification;
     if (map.getLayer("campus-buildings-3d")) map.setFilter("campus-buildings-3d", bFilter);
-    for (const layerId of ["campus-pins", "campus-labels"]) {
+    for (const layerId of ["campus-labels"]) {
       if (map.getLayer(layerId)) map.setFilter(layerId, notDb);
     }
     syncMarkers();
@@ -626,6 +611,22 @@ export function CampusMap({
     map.easeTo({ pitch: p > 10 ? 0 : 60, duration: 700, essential: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pitchSignal]);
+
+  // Fly to a location chosen from the search typeahead.
+  useEffect(() => {
+    if (!flyToTarget) return;
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current) return;
+    map.flyTo({
+      center: [flyToTarget.lng, flyToTarget.lat],
+      zoom: flyToTarget.zoom ?? 17,
+      pitch: 55,
+      bearing: -18,
+      duration: 1800,
+      essential: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyToTarget]);
 
   return (
     <div className="absolute inset-0 h-full w-full">

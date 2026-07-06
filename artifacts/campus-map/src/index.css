@@ -217,10 +217,9 @@
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* --- Building markers ---
-   NOTE: `.qmap-anchor` is the element Mapbox positions each frame; it must NOT
-   have any CSS transition/transform or the pin drifts/lags while panning. All
-   hover/selected motion lives on the inner `.qmap-marker`. */
+/* --- Building markers (Instagram-style event notification badges) ---
+   `.qmap-anchor` is positioned by Mapbox each frame — do NOT add CSS transforms
+   to it directly. All hover / selected motion lives on the inner `.qmap-marker`. */
 .qmap-anchor {
   --qmap-color: #64748b;
   cursor: pointer;
@@ -230,99 +229,81 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 4px;
   transform-origin: center bottom;
   will-change: transform;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .qmap-anchor:hover .qmap-marker {
-  transform: translateY(-3px) scale(1.06);
+  transform: translateY(-4px) scale(1.08);
 }
 .qmap-anchor:hover {
   z-index: 40 !important;
 }
-.qmap-pin {
+
+/* Notification pill — shows the event count */
+.qmap-notif {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 16px;
   background: var(--qmap-color);
-  border: 2.5px solid #fff;
-  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.5);
-}
-.dark .qmap-pin {
-  border-color: rgba(255, 255, 255, 0.9);
-}
-.qmap-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #fff;
-  transform: rotate(45deg);
-}
-.qmap-badge {
-  position: absolute;
-  top: -9px;
-  right: -9px;
-  transform: rotate(45deg);
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  display: grid;
-  place-items: center;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  color: #002452;
-  background: #fff;
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-.qmap-label {
-  margin-top: 5px;
-  max-width: 130px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 600;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-family: system-ui, -apple-system, sans-serif;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #0f2747;
-  background: rgba(255, 255, 255, 0.85);
-  border-radius: 999px;
-  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
-  opacity: 0;
-  transform: translateY(-3px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  border: 2.5px solid #fff;
+  box-shadow:
+    0 4px 14px -2px color-mix(in srgb, var(--qmap-color) 55%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.22);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
-.dark .qmap-label {
-  color: hsl(210 40% 96%);
-  background: rgba(13, 27, 46, 0.85);
+.dark .qmap-notif {
+  border-color: rgba(255, 255, 255, 0.85);
 }
-.qmap-anchor:hover .qmap-label,
-.qmap-anchor[data-selected="true"] .qmap-label,
-.qmap-anchor[data-status="active"] .qmap-label {
-  opacity: 1;
-  transform: translateY(0);
+/* Downward pointer triangle */
+.qmap-notif::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--qmap-color);
 }
+
+/* Selected state */
 .qmap-anchor[data-selected="true"] {
   z-index: 50 !important;
 }
 .qmap-anchor[data-selected="true"] .qmap-marker {
-  transform: scale(1.18);
+  transform: scale(1.22);
 }
-.qmap-anchor[data-selected="true"] .qmap-pin {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qmap-color) 35%, transparent),
-    0 8px 20px -4px rgba(0, 0, 0, 0.55);
+.qmap-anchor[data-selected="true"] .qmap-notif {
+  border-color: #fff;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--qmap-color) 35%, transparent),
+    0 6px 20px -4px color-mix(in srgb, var(--qmap-color) 65%, transparent);
 }
+
+/* Pulse ring for "happening now" events */
 .qmap-pulse {
   position: absolute;
-  top: 6px;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   background: var(--qmap-color);
   opacity: 0.7;
   animation: qmap-pulse 1.8s ease-out infinite;
@@ -330,16 +311,44 @@
 }
 @keyframes qmap-pulse {
   0% {
-    transform: scale(0.6);
+    transform: translateX(-50%) scale(0.7);
     opacity: 0.55;
   }
   70% {
-    transform: scale(2.4);
+    transform: translateX(-50%) scale(2.8);
     opacity: 0;
   }
   100% {
     opacity: 0;
   }
+}
+
+/* Building label — shown on hover / selected / active */
+.qmap-label {
+  max-width: 120px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #0f2747;
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.dark .qmap-label {
+  color: hsl(210 40% 96%);
+  background: rgba(13, 27, 46, 0.88);
+}
+.qmap-anchor:hover .qmap-label,
+.qmap-anchor[data-selected="true"] .qmap-label,
+.qmap-anchor[data-status="active"] .qmap-label {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* --- Glassmorphism panels --- */
