@@ -129,7 +129,7 @@ export function EventForm({ initialValues, onSubmit, isSubmitting }: EventFormPr
                       <SelectValue placeholder="Select a building" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
+                  <SelectContent className="max-h-60 overflow-y-auto">
                     {buildings.map(b => (
                       <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
                     ))}
