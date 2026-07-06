@@ -14,6 +14,19 @@ export interface ErrorResponse {
 }
 
 /**
+ * Building grouping used for map filtering
+ */
+export type BuildingCategory = typeof BuildingCategory[keyof typeof BuildingCategory];
+
+
+export const BuildingCategory = {
+  academic: 'academic',
+  student_life: 'student_life',
+  residences: 'residences',
+  landmarks: 'landmarks',
+} as const;
+
+/**
  * Highest priority event status for this building
  */
 export type BuildingEventStatus = typeof BuildingEventStatus[keyof typeof BuildingEventStatus];
@@ -43,12 +56,29 @@ export interface Building {
      * @nullable
      */
   footprint?: number[][] | null;
+  /** Building grouping used for map filtering */
+  category: BuildingCategory;
+  /**
+     * Optional photo URL for the building; clients show a placeholder when null
+     * @nullable
+     */
+  imageUrl?: string | null;
   /** Highest priority event status for this building */
   eventStatus: BuildingEventStatus;
   activeEventCount: number;
   todayEventCount: number;
   weekEventCount: number;
 }
+
+export type BuildingWithEventsCategory = typeof BuildingWithEventsCategory[keyof typeof BuildingWithEventsCategory];
+
+
+export const BuildingWithEventsCategory = {
+  academic: 'academic',
+  student_life: 'student_life',
+  residences: 'residences',
+  landmarks: 'landmarks',
+} as const;
 
 export type BuildingWithEventsEventStatus = typeof BuildingWithEventsEventStatus[keyof typeof BuildingWithEventsEventStatus];
 
@@ -109,6 +139,9 @@ export interface BuildingWithEvents {
   levels: number;
   /** @nullable */
   footprint?: number[][] | null;
+  category: BuildingWithEventsCategory;
+  /** @nullable */
+  imageUrl?: string | null;
   eventStatus: BuildingWithEventsEventStatus;
   activeEventCount: number;
   todayEventCount: number;

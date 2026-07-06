@@ -5,6 +5,7 @@
  * Queen's University Campus Map API
  * OpenAPI spec version: 0.1.0
  */
+import type { BuildingWithEventsCategory } from './buildingWithEventsCategory';
 import type { BuildingWithEventsEventStatus } from './buildingWithEventsEventStatus';
 import type { Event } from './event';
 
@@ -19,6 +20,9 @@ export interface BuildingWithEvents {
   levels: number;
   /** @nullable */
   footprint?: number[][] | null;
+  category: BuildingWithEventsCategory;
+  /** @nullable */
+  imageUrl?: string | null;
   eventStatus: BuildingWithEventsEventStatus;
   activeEventCount: number;
   todayEventCount: number;

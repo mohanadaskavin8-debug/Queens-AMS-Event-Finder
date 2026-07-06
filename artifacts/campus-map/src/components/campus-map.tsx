@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import type { Feature, FeatureCollection } from "geojson";
 import type { Building } from "@workspace/api-client-react";
 
@@ -11,14 +11,18 @@ interface CampusMapProps {
   selectedBuildingId: number | null;
   onSelectBuilding: (id: number | null) => void;
   theme: MapTheme;
+  /** Categories currently visible on the map. */
+  visibleCategories: Set<string>;
   /** Increment to trigger a fly-to-overview action. */
   recenterSignal?: number;
+  /** Increment to toggle the map tilt (pitch). */
+  pitchSignal?: number;
 }
 
-const STYLES: Record<MapTheme, string> = {
-  day: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-  night: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-};
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+
+const STANDARD_STYLE = "mapbox://styles/mapbox/standard";
+const LIGHT_PRESET: Record<MapTheme, string> = { day: "day", night: "night" };
 
 const CAMPUS_CENTER: [number, number] = [-76.4952, 44.2256];
 const OVERVIEW = { center: CAMPUS_CENTER, zoom: 15.4, pitch: 55, bearing: -18 };
@@ -30,22 +34,13 @@ const STATUS_COLOR: Record<string, string> = {
   none: "#64748b",
 };
 
-const THEME_CONTEXT: Record<MapTheme, { color: string; opacity: number }> = {
-  day: { color: "#c8d2e0", opacity: 0.92 },
-  night: { color: "#243449", opacity: 0.9 },
-};
-
-function firstSymbolLayerId(map: maplibregl.Map): string | undefined {
-  const layers = map.getStyle().layers ?? [];
-  for (const l of layers) {
-    if (l.type === "symbol") return l.id;
-  }
-  return undefined;
-}
-
-function buildingsToFeatureCollection(buildings: Building[]): FeatureCollection {
+function buildingsToFeatureCollection(
+  buildings: Building[],
+  visible: Set<string>
+): FeatureCollection {
   const features: Feature[] = [];
   for (const b of buildings) {
+    if (!visible.has(b.category)) continue;
     if (!b.footprint || b.footprint.length < 4) continue;
     features.push({
       type: "Feature",
@@ -67,151 +62,110 @@ export function CampusMap({
   selectedBuildingId,
   onSelectBuilding,
   theme,
+  visibleCategories,
   recenterSignal = 0,
+  pitchSignal = 0,
 }: CampusMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<Map<number, maplibregl.Marker>>(new Map());
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
   const buildingsRef = useRef<Building[]>(buildings);
+  const visibleRef = useRef<Set<string>>(visibleCategories);
   const selectedRef = useRef<number | null>(selectedBuildingId);
   const onSelectRef = useRef(onSelectBuilding);
   const styleReadyRef = useRef(false);
-  const styleGenRef = useRef(0);
-  const [initError, setInitError] = useState(false);
+  const [initError, setInitError] = useState<null | "token" | "webgl">(null);
 
   buildingsRef.current = buildings;
+  visibleRef.current = visibleCategories;
   selectedRef.current = selectedBuildingId;
   onSelectRef.current = onSelectBuilding;
 
-  // Add campus context (3D extrusions) + event highlight layers to current style.
-  const addCampusLayers = useCallback(async (map: maplibregl.Map, gen: number) => {
-    const ctx = THEME_CONTEXT[theme];
-    const beforeId = firstSymbolLayerId(map);
-
-    // Hide base style's flat building fills to avoid double-draw.
-    for (const l of map.getStyle().layers ?? []) {
-      if (/building/i.test(l.id) && l.type !== "symbol") {
-        try {
-          map.setLayoutProperty(l.id, "visibility", "none");
-        } catch {
-          /* noop */
-        }
-      }
+  // Add the event-status highlight source + extrusion layer + terrain.
+  const addCampusLayers = useCallback((map: mapboxgl.Map) => {
+    // Real 3D terrain relief.
+    if (!map.getSource("mapbox-dem")) {
+      map.addSource("mapbox-dem", {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
+    try {
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.1 });
+    } catch {
+      /* terrain unsupported, ignore */
     }
 
-    // Full-campus footprints for the 3D context (loaded once).
-    if (!map.getSource("campus")) {
-      let geojson: FeatureCollection;
-      try {
-        const url = `${import.meta.env.BASE_URL}queens-buildings.geojson`;
-        const res = await fetch(url);
-        geojson = await res.json();
-      } catch {
-        geojson = { type: "FeatureCollection", features: [] };
-      }
-      // Bail if the style was swapped or the map torn down while fetching.
-      if (gen !== styleGenRef.current || mapRef.current !== map) return;
-      if (!map.getSource("campus")) {
-        map.addSource("campus", { type: "geojson", data: geojson });
-      }
-    }
-
-    if (!map.getLayer("campus-3d")) {
-      map.addLayer(
-        {
-          id: "campus-3d",
-          type: "fill-extrusion",
-          source: "campus",
-          paint: {
-            "fill-extrusion-color": [
-              "interpolate",
-              ["linear"],
-              ["get", "height"],
-              0, ctx.color,
-              40, theme === "day" ? "#aeb9cb" : "#2e4258",
-            ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>,
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-base": 0,
-            "fill-extrusion-opacity": ctx.opacity,
-            "fill-extrusion-vertical-gradient": true,
-          },
-        },
-        beforeId
-      );
-    }
-
-    // Event-building highlight extrusions.
+    // Event-building highlight extrusions (colored by status).
     if (!map.getSource("events")) {
       map.addSource("events", {
         type: "geojson",
-        data: buildingsToFeatureCollection(buildingsRef.current),
+        data: buildingsToFeatureCollection(buildingsRef.current, visibleRef.current),
         promoteId: "id",
       });
     }
 
     if (!map.getLayer("events-3d")) {
-      map.addLayer(
-        {
-          id: "events-3d",
-          type: "fill-extrusion",
-          source: "events",
-          paint: {
-            "fill-extrusion-color": [
-              "match",
-              ["get", "status"],
-              "active", STATUS_COLOR.active,
-              "upcoming_today", STATUS_COLOR.upcoming_today,
-              "upcoming_week", STATUS_COLOR.upcoming_week,
-              STATUS_COLOR.none,
-            ],
-            "fill-extrusion-height": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false],
-              ["+", ["get", "height"], 14],
-              ["+", ["get", "height"], 4],
-            ],
-            "fill-extrusion-base": 0,
-            "fill-extrusion-opacity": [
-              "case",
-              ["==", ["get", "status"], "none"],
-              0.55,
-              0.95,
-            ],
-            "fill-extrusion-vertical-gradient": true,
-          },
+      map.addLayer({
+        id: "events-3d",
+        type: "fill-extrusion",
+        source: "events",
+        slot: "middle",
+        paint: {
+          "fill-extrusion-color": [
+            "match",
+            ["get", "status"],
+            "active", STATUS_COLOR.active,
+            "upcoming_today", STATUS_COLOR.upcoming_today,
+            "upcoming_week", STATUS_COLOR.upcoming_week,
+            STATUS_COLOR.none,
+          ],
+          "fill-extrusion-height": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            ["+", ["get", "height"], 14],
+            ["+", ["get", "height"], 4],
+          ],
+          "fill-extrusion-base": 0,
+          "fill-extrusion-opacity": [
+            "case",
+            ["==", ["get", "status"], "none"],
+            0.5,
+            0.92,
+          ],
+          "fill-extrusion-vertical-gradient": true,
         },
-        beforeId
-      );
-    }
-
-    // Atmospheric sky for depth.
-    try {
-      map.setSky({
-        "sky-color": theme === "day" ? "#bcd4ef" : "#0a1626",
-        "horizon-color": theme === "day" ? "#eaf1fb" : "#16263d",
-        "fog-color": theme === "day" ? "#e9eef6" : "#0d1b2e",
-        "fog-ground-blend": 0.5,
-        "sky-horizon-blend": 0.6,
-        "horizon-fog-blend": 0.5,
-        "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 12, 0.2, 16, 0],
-      } as maplibregl.SkySpecification);
-    } catch {
-      /* sky unsupported, ignore */
+      });
     }
 
     styleReadyRef.current = true;
     syncMarkers();
     applySelection(selectedRef.current);
-  }, [theme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Build / update floating HTML markers.
+  // Build / update floating HTML markers. The Marker element (`.qmap-anchor`)
+  // must stay transition-free so Mapbox can position it every frame with no lag.
   const syncMarkers = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     const seen = new Set<number>();
 
     for (const b of buildingsRef.current) {
+      const categoryVisible = visibleRef.current.has(b.category);
+      let marker = markersRef.current.get(b.id);
+
+      if (!categoryVisible) {
+        if (marker) {
+          marker.remove();
+          markersRef.current.delete(b.id);
+        }
+        continue;
+      }
       seen.add(b.id);
+
       const status = b.eventStatus;
       const color = STATUS_COLOR[status] ?? STATUS_COLOR.none;
       const count =
@@ -219,16 +173,15 @@ export function CampusMap({
           ? b.activeEventCount + b.todayEventCount
           : b.weekEventCount;
 
-      let marker = markersRef.current.get(b.id);
       if (!marker) {
         const el = document.createElement("div");
-        el.className = "qmap-marker";
+        el.className = "qmap-anchor";
         el.addEventListener("click", (e) => {
           e.stopPropagation();
           const cur = selectedRef.current;
           onSelectRef.current(cur === b.id ? null : b.id);
         });
-        marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
+        marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
           .setLngLat([b.longitude, b.latitude])
           .addTo(map);
         markersRef.current.set(b.id, marker);
@@ -243,11 +196,13 @@ export function CampusMap({
       el.dataset.selected = String(isSelected);
       el.style.setProperty("--qmap-color", color);
       el.style.zIndex = isSelected ? "30" : isActive ? "20" : "10";
-      el.replaceChildren();
+
+      const inner = document.createElement("div");
+      inner.className = "qmap-marker";
       if (isActive) {
         const pulse = document.createElement("span");
         pulse.className = "qmap-pulse";
-        el.appendChild(pulse);
+        inner.appendChild(pulse);
       }
       const pin = document.createElement("span");
       pin.className = "qmap-pin";
@@ -260,11 +215,12 @@ export function CampusMap({
         badge.textContent = String(count);
         pin.appendChild(badge);
       }
-      el.appendChild(pin);
+      inner.appendChild(pin);
       const label = document.createElement("span");
       label.className = "qmap-label";
       label.textContent = b.shortName;
-      el.appendChild(label);
+      inner.appendChild(label);
+      el.replaceChildren(inner);
     }
 
     for (const [id, marker] of markersRef.current) {
@@ -284,7 +240,7 @@ export function CampusMap({
         try {
           map.setFeatureState({ source: "events", id: b.id }, { selected: b.id === id });
         } catch {
-          /* feature not in source (marker-only) */
+          /* feature not in source (marker-only / hidden) */
         }
       }
     }
@@ -312,38 +268,58 @@ export function CampusMap({
   // Initialize map once.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    let map: maplibregl.Map;
+
+    if (!MAPBOX_TOKEN) {
+      setInitError("token");
+      return;
+    }
+
+    let map: mapboxgl.Map;
     try {
-      map = new maplibregl.Map({
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      map = new mapboxgl.Map({
         container: containerRef.current,
-        style: STYLES[theme],
+        style: STANDARD_STYLE,
         center: CAMPUS_CENTER,
         zoom: 13.6,
         pitch: 0,
         bearing: 0,
-        canvasContextAttributes: { antialias: true },
-        attributionControl: { compact: true },
-        maxPitch: 75,
+        antialias: true,
+        attributionControl: false,
+        maxPitch: 80,
       });
     } catch (err) {
-      console.error("Failed to initialize MapLibre (WebGL unavailable)", err);
-      setInitError(true);
+      console.error("Failed to initialize Mapbox (WebGL unavailable)", err);
+      setInitError("webgl");
       return;
     }
     mapRef.current = map;
 
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-left");
     map.addControl(
-      new maplibregl.NavigationControl({ visualizePitch: true, showZoom: true, showCompass: true }),
+      new mapboxgl.NavigationControl({ visualizePitch: true, showZoom: true, showCompass: true }),
       "bottom-right"
     );
 
-    map.on("load", () => {
-      void addCampusLayers(map, styleGenRef.current).then(() => {
-        map.flyTo({ ...OVERVIEW, duration: 3200, essential: true });
-      });
+    map.on("style.load", () => {
+      try {
+        map.setConfigProperty("basemap", "lightPreset", LIGHT_PRESET[theme]);
+      } catch {
+        /* config unsupported, ignore */
+      }
+      addCampusLayers(map);
+      map.flyTo({ ...OVERVIEW, duration: 3200, essential: true });
     });
 
-    // Clicking a highlighted building footprint selects it; clicking empty map clears.
+    map.on("error", (e) => {
+      // A bad/expired token surfaces here; degrade to the fallback panel.
+      const msg = (e?.error as { message?: string } | undefined)?.message ?? "";
+      if (/access token|401|Unauthorized/i.test(msg)) {
+        setInitError("token");
+      }
+    });
+
+    // Clicking a highlighted building footprint selects it; empty map clears.
     map.on("click", (e) => {
       if (map.getLayer("events-3d")) {
         const feats = map.queryRenderedFeatures(e.point, { layers: ["events-3d"] });
@@ -367,7 +343,6 @@ export function CampusMap({
     return () => {
       for (const [, marker] of markersRef.current) marker.remove();
       markersRef.current.clear();
-      styleGenRef.current += 1;
       map.remove();
       mapRef.current = null;
       styleReadyRef.current = false;
@@ -375,35 +350,27 @@ export function CampusMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle theme switch: reload style and re-add layers.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (!map.isStyleLoaded() && !styleReadyRef.current) return;
-    styleReadyRef.current = false;
-    styleGenRef.current += 1;
-    const gen = styleGenRef.current;
-    map.setStyle(STYLES[theme]);
-    const handler = () => {
-      void addCampusLayers(map, gen);
-    };
-    map.once("idle", handler);
-    return () => {
-      map.off("idle", handler);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme]);
-
-  // Update event source + markers when buildings change.
+  // Day / night via Standard light preset (no style reload).
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !styleReadyRef.current) return;
-    const src = map.getSource("events") as maplibregl.GeoJSONSource | undefined;
-    if (src) src.setData(buildingsToFeatureCollection(buildings));
+    try {
+      map.setConfigProperty("basemap", "lightPreset", LIGHT_PRESET[theme]);
+    } catch {
+      /* ignore */
+    }
+  }, [theme]);
+
+  // Update event source + markers when buildings or category visibility change.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current) return;
+    const src = map.getSource("events") as mapboxgl.GeoJSONSource | undefined;
+    if (src) src.setData(buildingsToFeatureCollection(buildings, visibleCategories));
     syncMarkers();
     applySelection(selectedRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildings]);
+  }, [buildings, visibleCategories]);
 
   // React to selection changes.
   useEffect(() => {
@@ -419,18 +386,28 @@ export function CampusMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recenterSignal]);
 
+  // Toggle tilt / pitch.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || pitchSignal === 0) return;
+    const p = map.getPitch();
+    map.easeTo({ pitch: p > 10 ? 0 : 60, duration: 700, essential: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pitchSignal]);
+
   return (
     <div className="absolute inset-0 h-full w-full">
       <div ref={containerRef} className="absolute inset-0 h-full w-full" />
       {initError && (
         <div className="absolute inset-0 flex items-center justify-center bg-background p-8">
           <div className="max-w-md text-center">
-            <h2 className="text-lg font-semibold text-foreground">Map unavailable</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              {initError === "token" ? "Map needs configuration" : "Map unavailable"}
+            </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              This interactive 3D map needs WebGL, which isn&apos;t available in the
-              current view. Try opening the app in a modern desktop browser with
-              hardware acceleration enabled. Event listings and search still work in
-              the sidebar.
+              {initError === "token"
+                ? "This interactive 3D map needs a Mapbox access token to load. Once it's configured, the map will appear here. Event listings, search, and building details still work in the sidebar."
+                : "This interactive 3D map needs WebGL, which isn't available in the current view. Try opening the app in a modern desktop browser with hardware acceleration enabled. Event listings and search still work in the sidebar."}
             </p>
           </div>
         </div>

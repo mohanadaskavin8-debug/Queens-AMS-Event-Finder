@@ -270,6 +270,13 @@ components:
             type: array
             items:
               type: number
+        category:
+          type: string
+          enum: [academic, student_life, residences, landmarks]
+          description: Building grouping used for map filtering
+        imageUrl:
+          type: ["string", "null"]
+          description: Optional photo URL for the building; clients show a placeholder when null
         eventStatus:
           type: string
           enum: [none, upcoming_week, upcoming_today, active]
@@ -287,6 +294,7 @@ components:
         - latitude
         - longitude
         - levels
+        - category
         - eventStatus
         - activeEventCount
         - todayEventCount
@@ -315,6 +323,11 @@ components:
             type: array
             items:
               type: number
+        category:
+          type: string
+          enum: [academic, student_life, residences, landmarks]
+        imageUrl:
+          type: ["string", "null"]
         eventStatus:
           type: string
           enum: [none, upcoming_week, upcoming_today, active]
@@ -335,6 +348,7 @@ components:
         - latitude
         - longitude
         - levels
+        - category
         - eventStatus
         - activeEventCount
         - todayEventCount

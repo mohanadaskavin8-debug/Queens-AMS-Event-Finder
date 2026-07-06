@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetCl
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EventCard } from "./event-card";
+import { BUILDING_CATEGORY_META } from "./campus-sidebar";
 import { MapPin, Activity, CalendarDays, Calendar } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -27,14 +28,45 @@ export function EventPanel({ building, isOpen, onClose, isLoading }: EventPanelP
           </div>
         ) : building ? (
           <>
+            {(() => {
+              const meta = BUILDING_CATEGORY_META[building.category];
+              const CategoryIcon = meta?.icon ?? MapPin;
+              return (
+                <div className="relative h-44 w-full shrink-0 overflow-hidden bg-muted">
+                  {building.imageUrl ? (
+                    <img
+                      src={building.imageUrl}
+                      alt={building.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-full w-full items-center justify-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${meta?.color ?? "#64748b"} 0%, #002452 100%)`,
+                      }}
+                    >
+                      <CategoryIcon className="h-16 w-16 text-white/40" />
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
+                  {meta && (
+                    <Badge className="absolute left-4 top-4 gap-1.5 border-none bg-white/90 text-foreground shadow-sm backdrop-blur">
+                      <CategoryIcon className="h-3.5 w-3.5" style={{ color: meta.color }} />
+                      {meta.short}
+                    </Badge>
+                  )}
+                  <h2 className="absolute bottom-3 left-4 right-4 text-2xl font-bold text-white drop-shadow-md">
+                    {building.name}
+                  </h2>
+                </div>
+              );
+            })()}
             <SheetHeader className="p-6 pb-4 text-left border-b bg-muted/20">
               <div className="flex items-start justify-between">
                 <div>
-                  <SheetTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-                    <MapPin className="w-6 h-6 text-primary" />
-                    {building.name}
-                  </SheetTitle>
-                  <SheetDescription className="mt-2 text-base">
+                  <SheetTitle className="sr-only">{building.name}</SheetTitle>
+                  <SheetDescription className="text-base text-foreground/80">
                     {building.description || "Campus building at Queen's University"}
                   </SheetDescription>
                 </div>

@@ -10,6 +10,7 @@ An interactive 3D campus map for discovering Queen's University events geographi
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only; see Gotchas — fails in non-TTY)
+- `pnpm --filter @workspace/db run seed` — seed/refresh the canonical building set (idempotent; preserves existing footprints). Source: `lib/db/seed/buildings.sql`
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack

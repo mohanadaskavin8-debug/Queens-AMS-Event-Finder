@@ -13,10 +13,10 @@ import { CampusMap, type MapTheme } from "@/components/campus-map";
 import { EventPanel } from "@/components/event-panel";
 import { FilterBar } from "@/components/filter-bar";
 import { SearchBar } from "@/components/search-bar";
-import { UpcomingEventsSidebar } from "@/components/upcoming-events-sidebar";
+import { CampusSidebar, BUILDING_CATEGORIES } from "@/components/campus-sidebar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Plus, Sun, Moon, Crosshair, ChevronLeft, MapPin } from "lucide-react";
+import { Menu, Plus, Sun, Moon, Crosshair, ChevronLeft, MapPin, Box } from "lucide-react";
 import { ManageEventDialog } from "@/components/manage-event-dialog";
 
 const LEGEND = [
@@ -36,6 +36,23 @@ export default function MapView() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mapTheme, setMapTheme] = useState<MapTheme>("day");
   const [recenter, setRecenter] = useState(0);
+  const [pitchSignal, setPitchSignal] = useState(0);
+  const [visibleCategories, setVisibleCategories] = useState<Set<string>>(
+    () => new Set(BUILDING_CATEGORIES)
+  );
+
+  const toggleCategory = (cat: string) =>
+    setVisibleCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+
+  const handleSelectBuildingFromList = (id: number) => {
+    setSelectedBuildingId(id);
+    setMobileSidebarOpen(false);
+  };
 
   const { data: buildings = [] } = useListBuildings({
     query: { queryKey: getListBuildingsQueryKey(), refetchInterval: 60000 },
@@ -93,7 +110,9 @@ export default function MapView() {
         selectedBuildingId={selectedBuildingId}
         onSelectBuilding={setSelectedBuildingId}
         theme={mapTheme}
+        visibleCategories={visibleCategories}
         recenterSignal={recenter}
+        pitchSignal={pitchSignal}
       />
 
       {/* Top bar */}
@@ -159,11 +178,19 @@ export default function MapView() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[88vw] max-w-sm p-0">
-                <SheetTitle className="sr-only">Upcoming events</SheetTitle>
+                <SheetTitle className="sr-only">Explore campus</SheetTitle>
                 <SheetDescription className="sr-only">
-                  Browse events happening around campus.
+                  Search buildings, filter categories, and browse events around campus.
                 </SheetDescription>
-                <UpcomingEventsSidebar events={filteredEvents} isLoading={isLoadingEvents} />
+                <CampusSidebar
+                  buildings={buildings}
+                  events={filteredEvents}
+                  isLoadingEvents={isLoadingEvents}
+                  visibleCategories={visibleCategories}
+                  onToggleCategory={toggleCategory}
+                  selectedBuildingId={selectedBuildingId}
+                  onSelectBuilding={handleSelectBuildingFromList}
+                />
               </SheetContent>
             </Sheet>
           </div>
@@ -201,7 +228,15 @@ export default function MapView() {
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <UpcomingEventsSidebar events={filteredEvents} isLoading={isLoadingEvents} />
+          <CampusSidebar
+            buildings={buildings}
+            events={filteredEvents}
+            isLoadingEvents={isLoadingEvents}
+            visibleCategories={visibleCategories}
+            onToggleCategory={toggleCategory}
+            selectedBuildingId={selectedBuildingId}
+            onSelectBuilding={handleSelectBuildingFromList}
+          />
         </div>
       </div>
 
@@ -217,16 +252,27 @@ export default function MapView() {
         </Button>
       )}
 
-      {/* Recenter */}
-      <Button
-        size="icon"
-        variant="ghost"
-        onClick={() => setRecenter((n) => n + 1)}
-        className="glass absolute bottom-28 right-4 z-10 h-11 w-11 rounded-2xl text-foreground hover:text-foreground"
-        title="Recenter map"
-      >
-        <Crosshair className="h-5 w-5" />
-      </Button>
+      {/* Map controls */}
+      <div className="absolute bottom-28 right-4 z-10 flex flex-col gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setPitchSignal((n) => n + 1)}
+          className="glass h-11 w-11 rounded-2xl text-foreground hover:text-foreground"
+          title="Toggle 3D tilt"
+        >
+          <Box className="h-5 w-5" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setRecenter((n) => n + 1)}
+          className="glass h-11 w-11 rounded-2xl text-foreground hover:text-foreground"
+          title="Recenter map"
+        >
+          <Crosshair className="h-5 w-5" />
+        </Button>
+      </div>
 
       {/* Legend */}
       <div className="glass fade-up pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full px-4 py-2">

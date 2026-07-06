@@ -7,10 +7,12 @@
  */
 
 export * from './building';
+export * from './buildingCategory';
 export * from './buildingEventStatus';
 export * from './buildingEventSummary';
 export * from './buildingEventSummaryEventStatus';
 export * from './buildingWithEvents';
+export * from './buildingWithEventsCategory';
 export * from './buildingWithEventsEventStatus';
 export * from './errorResponse';
 export * from './event';
