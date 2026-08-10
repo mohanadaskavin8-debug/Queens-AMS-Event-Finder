@@ -45,7 +45,7 @@ export function FilterBar({ category, timeframe, onChangeCategory, onChangeTimef
                 <ToggleGroupItem value="all" className="h-8 px-3 text-xs rounded-md data-[state=on]:bg-background data-[state=on]:shadow-sm">All</ToggleGroupItem>
                 <ToggleGroupItem value="ams" className="h-8 px-3 text-xs rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">AMS</ToggleGroupItem>
                 <ToggleGroupItem value="academic" className="h-8 px-3 text-xs rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Academic</ToggleGroupItem>
-                <ToggleGroupItem value="club" className="h-8 px-3 text-xs rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Club</ToggleGroupItem>
+                <ToggleGroupItem value="residence" className="h-8 px-3 text-xs rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Residence</ToggleGroupItem>
                 <ToggleGroupItem value="athletics" className="h-8 px-3 text-xs rounded-md data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Athletics</ToggleGroupItem>
               </ToggleGroup>
             </div>

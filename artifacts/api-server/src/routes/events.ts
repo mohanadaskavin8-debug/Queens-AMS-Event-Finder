@@ -98,7 +98,7 @@ router.get("/events", async (req, res): Promise<void> => {
   const conditions = [];
 
   if (category && category !== "all") {
-    conditions.push(eq(eventsTable.category, category as "ams" | "club" | "academic" | "athletics"));
+    conditions.push(eq(eventsTable.category, category as "ams" | "residence" | "academic" | "athletics"));
   }
 
   if (timeframe === "now") {

@@ -12,7 +12,7 @@ export type ListEventsCategory = typeof ListEventsCategory[keyof typeof ListEven
 export const ListEventsCategory = {
   all: 'all',
   ams: 'ams',
-  club: 'club',
+  residence: 'residence',
   academic: 'academic',
   athletics: 'athletics',
 } as const;

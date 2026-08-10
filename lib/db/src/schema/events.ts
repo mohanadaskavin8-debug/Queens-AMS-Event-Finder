@@ -15,7 +15,7 @@ export const eventsTable = pgTable("events", {
   description: text("description"),
   registrationLink: text("registration_link"),
   locationDetails: text("location_details"),
-  category: text("category", { enum: ["ams", "club", "academic", "athletics"] }).notNull(),
+  category: text("category", { enum: ["ams", "residence", "academic", "athletics"] }).notNull(),
 });
 
 export const insertEventSchema = createInsertSchema(eventsTable).omit({ id: true });

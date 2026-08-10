@@ -106,7 +106,7 @@ export function EventForm({ initialValues, onSubmit, isSubmitting }: EventFormPr
                   <SelectContent>
                     <SelectItem value="academic">Academic</SelectItem>
                     <SelectItem value="ams">AMS</SelectItem>
-                    <SelectItem value="club">Club</SelectItem>
+                    <SelectItem value="residence">Residence</SelectItem>
                     <SelectItem value="athletics">Athletics</SelectItem>
                   </SelectContent>
                 </Select>

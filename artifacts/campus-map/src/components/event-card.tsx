@@ -45,7 +45,7 @@ export function EventCard({ event, expanded = false }: EventCardProps) {
   const getCategoryColor = (category: EventCategory) => {
     switch (category) {
       case "ams": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-200";
-      case "club": return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-200";
+      case "residence": return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-200";
       case "academic": return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-200";
       case "athletics": return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200";
       default: return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200";

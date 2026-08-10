@@ -74,7 +74,7 @@ export const GetBuildingResponse = zod.object({
   "description": zod.string().nullish(),
   "registrationLink": zod.string().nullish(),
   "locationDetails": zod.string().nullish(),
-  "category": zod.enum(['ams', 'club', 'academic', 'athletics']),
+  "category": zod.enum(['ams', 'residence', 'academic', 'athletics']),
   "status": zod.enum(['active', 'upcoming_today', 'upcoming_week', 'future'])
 }))
 })
@@ -85,7 +85,7 @@ export const GetBuildingResponse = zod.object({
  * @summary List events with optional filters
  */
 export const ListEventsQueryParams = zod.object({
-  "category": zod.enum(['all', 'ams', 'club', 'academic', 'athletics']).optional(),
+  "category": zod.enum(['all', 'ams', 'residence', 'academic', 'athletics']).optional(),
   "timeframe": zod.enum(['all', 'now', 'today', 'week']).optional(),
   "search": zod.coerce.string().optional(),
   "buildingId": zod.coerce.number().optional()
@@ -102,7 +102,7 @@ export const ListEventsResponseItem = zod.object({
   "description": zod.string().nullish(),
   "registrationLink": zod.string().nullish(),
   "locationDetails": zod.string().nullish(),
-  "category": zod.enum(['ams', 'club', 'academic', 'athletics']),
+  "category": zod.enum(['ams', 'residence', 'academic', 'athletics']),
   "status": zod.enum(['active', 'upcoming_today', 'upcoming_week', 'future'])
 })
 export const ListEventsResponse = zod.array(ListEventsResponseItem)
@@ -124,7 +124,7 @@ export const CreateEventBody = zod.object({
   "description": zod.string().optional(),
   "registrationLink": zod.string().optional(),
   "locationDetails": zod.string().optional(),
-  "category": zod.enum(['ams', 'club', 'academic', 'athletics'])
+  "category": zod.enum(['ams', 'residence', 'academic', 'athletics'])
 })
 
 
@@ -146,7 +146,7 @@ export const GetEventResponse = zod.object({
   "description": zod.string().nullish(),
   "registrationLink": zod.string().nullish(),
   "locationDetails": zod.string().nullish(),
-  "category": zod.enum(['ams', 'club', 'academic', 'athletics']),
+  "category": zod.enum(['ams', 'residence', 'academic', 'athletics']),
   "status": zod.enum(['active', 'upcoming_today', 'upcoming_week', 'future'])
 })
 
@@ -171,7 +171,7 @@ export const UpdateEventBody = zod.object({
   "description": zod.string().optional(),
   "registrationLink": zod.string().optional(),
   "locationDetails": zod.string().optional(),
-  "category": zod.enum(['ams', 'club', 'academic', 'athletics']).optional()
+  "category": zod.enum(['ams', 'residence', 'academic', 'athletics']).optional()
 })
 
 export const UpdateEventResponse = zod.object({
@@ -185,7 +185,7 @@ export const UpdateEventResponse = zod.object({
   "description": zod.string().nullish(),
   "registrationLink": zod.string().nullish(),
   "locationDetails": zod.string().nullish(),
-  "category": zod.enum(['ams', 'club', 'academic', 'athletics']),
+  "category": zod.enum(['ams', 'residence', 'academic', 'athletics']),
   "status": zod.enum(['active', 'upcoming_today', 'upcoming_week', 'future'])
 })
 

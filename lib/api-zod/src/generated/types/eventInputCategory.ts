@@ -11,7 +11,7 @@ export type EventInputCategory = typeof EventInputCategory[keyof typeof EventInp
 
 export const EventInputCategory = {
   ams: 'ams',
-  club: 'club',
+  residence: 'residence',
   academic: 'academic',
   athletics: 'athletics',
 } as const;

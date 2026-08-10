@@ -95,7 +95,7 @@ export type EventCategory = typeof EventCategory[keyof typeof EventCategory];
 
 export const EventCategory = {
   ams: 'ams',
-  club: 'club',
+  residence: 'residence',
   academic: 'academic',
   athletics: 'athletics',
 } as const;
@@ -154,7 +154,7 @@ export type EventInputCategory = typeof EventInputCategory[keyof typeof EventInp
 
 export const EventInputCategory = {
   ams: 'ams',
-  club: 'club',
+  residence: 'residence',
   academic: 'academic',
   athletics: 'athletics',
 } as const;
@@ -178,7 +178,7 @@ export type EventUpdateCategory = typeof EventUpdateCategory[keyof typeof EventU
 
 export const EventUpdateCategory = {
   ams: 'ams',
-  club: 'club',
+  residence: 'residence',
   academic: 'academic',
   athletics: 'athletics',
 } as const;
@@ -229,7 +229,7 @@ export type ListEventsCategory = typeof ListEventsCategory[keyof typeof ListEven
 export const ListEventsCategory = {
   all: 'all',
   ams: 'ams',
-  club: 'club',
+  residence: 'residence',
   academic: 'academic',
   athletics: 'athletics',
 } as const;
