@@ -1,68 +1,150 @@
-# Queen's University Campus Map
+# Queen's AMS Event Finder
 
-An interactive 3D campus map for discovering Queen's University events geographically. Buildings are color-highlighted by event status (happening now / today / this week), and clicking a building reveals its events with full details. Includes filtering, search, and add/edit/delete event management. This is a pilot.
+An interactive 3D campus map for discovering events at Queen's University.
 
-## Run & Operate
+Instead of browsing a separate event list, the application connects events to the physical campus. Users can search for buildings, events, or organizers, explore the campus on a 3D map, and click buildings to see the events happening there.
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (binds to the `PORT` env var; proxied at `/api`)
-- `pnpm --filter @workspace/campus-map run dev` — run the web app (binds to `PORT`; served at `/`)
-- `pnpm --filter @workspace/campus-map run typecheck` — typecheck the web artifact (use this, not `build`, from the shell)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only; see Gotchas — fails in non-TTY)
-- `pnpm --filter @workspace/db run seed` — seed/refresh the canonical building set (idempotent; preserves existing footprints). Source: `lib/db/seed/buildings.sql`
-- Required env: `DATABASE_URL` — Postgres connection string
+## Features
 
-## Stack
+* Interactive 3D Queen's campus map
+* Search buildings, events, and organizers
+* Filter events by category
+* Filter events by time
+* View upcoming events
+* Click buildings to see associated events
+* View event details
+* Add, edit, and delete events
+* Day and night map modes
+* Recenter map controls
+* Responsive event panels and search interface
+* WebGL fallback when 3D map rendering is unavailable
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Web: React + Vite, TanStack Query, Tailwind + shadcn/ui
-- Map: MapLibre GL JS (3D fill-extrusion); footprints from OpenStreetMap
+## Event Search
 
-## Where things live
+The search experience works across the campus and event data.
 
-- DB schema (source of truth): `lib/db/src/schema/buildings.ts`, `lib/db/src/schema/events.ts`
-- API contract (source of truth): `lib/api-spec` (OpenAPI) → generated hooks/schemas in `lib/api-client-react/src/generated`
-- API routes: `artifacts/api-server/src/routes/{buildings,events,health}.ts`
-- Web app: `artifacts/campus-map/src`
-  - `pages/map-view.tsx` — top-level orchestrator (state, data fetching, layout)
-  - `components/campus-map.tsx` — MapLibre 3D map (extrusions, event highlight layer, markers, fly-to, day/night)
-  - `components/{filter-bar,search-bar,upcoming-events-sidebar,event-panel,manage-event-dialog,event-form}.tsx`
-  - `index.css` — theme tokens + glass/marker/animation styles
-- Building footprints: `artifacts/campus-map/public/queens-buildings.geojson` (served statically, loaded by the map)
+Users can search for:
 
-## Architecture decisions
+* Buildings
+* Events
+* Organizers
 
-- **Building footprints come from OpenStreetMap, not Qmulus.** The requested Qmulus API was unusable (token-gated behind @queensu.ca SSO, DNS resolution failed), so real OSM footprints are used for the campus buildings. 11 buildings have real footprints; a few are marker-only.
-- **MapLibre GL (not Leaflet)** for true 3D fill-extrusion buildings and a premium look. WebGL is required — see Gotchas.
-- **Event status is computed and drives color**: active now = green (#16a34a), today = gold (#F9A01B), this week = blue (#3b82f6), none = slate (#64748b). Queen's brand: blue #002452, gold #F9A01B.
-- **Contract-first**: API shape is defined in OpenAPI; the server validates with generated Zod schemas and the client uses generated TanStack Query hooks. Regenerate with the codegen command after spec changes.
-- The map degrades gracefully: if WebGL is unavailable, `campus-map.tsx` catches the init error and shows a "Map unavailable" fallback while the rest of the UI (search, filters, event lists) keeps working.
+Events can also be filtered by:
 
-## Product
+* Category
+* Current status
+* Today
+* This week
 
-- Full-bleed 3D campus map with floating glass UI panels.
-- Buildings highlighted by event status; click a building to see its events (name, organizer, date/times, description, registration link, room/location).
-- Upcoming-events sidebar, status legend, day/night toggle, recenter control.
-- Filtering by category (All / AMS / Club / Academic / Athletics) and time (Now / Today / Week).
-- Search across events, organizers, and buildings.
-- Add / edit / delete events.
+Buildings are highlighted based on the events associated with them.
 
-## User preferences
+## 3D Campus Map
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The campus map is built with **MapLibre GL JS** and uses 3D building extrusions.
 
-## Gotchas
+Building footprints are based on OpenStreetMap data.
 
-- **`pnpm --filter @workspace/db run push` prompts interactively and fails in a non-TTY shell.** When the schema requires a destructive change, drop the affected tables manually via `psql "$DATABASE_URL" -c 'DROP TABLE ... CASCADE'` and then run push, or seed via a generated SQL file piped to `psql`.
-- **The map needs WebGL.** The agent screenshot tool runs headless Chrome with no GPU, so the map will show the "Map unavailable" fallback in screenshots even though it renders fine in a real browser. Do not treat that fallback in a screenshot as a bug.
-- Verify the web artifact with `typecheck`, not `build` (build needs workflow-provided `PORT`/`BASE_PATH`).
-- Access services via the shared proxy at `localhost:80` (e.g. `localhost:80/api/buildings`), never the internal service port.
+Clicking a building opens its associated events, including information such as:
 
-## Pointers
+* Event name
+* Organizer
+* Date and time
+* Description
+* Room/location
+* Registration link
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+## Architecture
+
+```text
+React + Vite
+      ↓
+TanStack Query
+      ↓
+Express API
+      ↓
+PostgreSQL
+      ↓
+Buildings + Events
+```
+
+The API is defined using OpenAPI and validated with Zod. The frontend uses generated API hooks to communicate with the backend.
+
+## Tech Stack
+
+* TypeScript
+* React
+* Vite
+* Express
+* PostgreSQL
+* Drizzle ORM
+* Zod
+* OpenAPI
+* Orval
+* TanStack Query
+* Tailwind CSS
+* shadcn/ui
+* MapLibre GL JS
+* OpenStreetMap
+
+## Project Structure
+
+```text
+artifacts/
+├── api-server/
+│   └── Express API
+│
+└── campus-map/
+    └── React web application
+
+lib/
+├── db/
+│   └── Database schema and seed data
+│
+├── api-spec/
+│   └── OpenAPI specification
+│
+└── api-client-react/
+    └── Generated API hooks and schemas
+```
+
+## Map Data
+
+The application uses OpenStreetMap building footprints for the campus map.
+
+MapLibre was chosen instead of a standard 2D map because the project is designed around 3D building visualization.
+
+## Running Locally
+
+Install dependencies:
+
+```bash
+pnpm install
+```
+
+Run the API:
+
+```bash
+pnpm --filter @workspace/api-server run dev
+```
+
+Run the campus map:
+
+```bash
+pnpm --filter @workspace/campus-map run dev
+```
+
+Run type checking:
+
+```bash
+pnpm run typecheck
+```
+
+A PostgreSQL `DATABASE_URL` is required.
+
+## Status
+
+Pilot / actively developed.
+
+---
+
+Built by **Kavin Mohanadas**
